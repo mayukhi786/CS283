@@ -237,6 +237,15 @@ int main(int argc, char *argv[]){
         case 'r':
             reverse_string(buff, user_str_len); //Call the required function
             break;
+        
+        case 'x':
+            // checking if there are 5 arguments in total (3 after -x)
+            if (argc < 5){
+                usage(argv[0]);
+                exit(1);
+            }
+            printf("Not implemented!\n");
+            exit(3); //exit with error code
 
         default:
             usage(argv[0]);
