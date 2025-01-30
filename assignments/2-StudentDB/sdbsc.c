@@ -103,7 +103,7 @@ int add_student(int fd, int id, char *fname, char *lname, int gpa){
     student_t s;
     int status = get_student(fd, id, &s);
     if (status == NO_ERROR) {
-        printf(M_ERR_DB_ADD_DUP);
+        printf(M_ERR_DB_ADD_DUP, s.id);
         return ERR_DB_OP;
     }
     if (status == ERR_DB_FILE) {
@@ -118,7 +118,7 @@ int add_student(int fd, int id, char *fname, char *lname, int gpa){
         printf(M_ERR_DB_WRITE);
         return ERR_DB_FILE;
     }
-    printf(M_STD_ADDED);
+    printf(M_STD_ADDED, s.id);
     return NO_ERROR;
 }
 
@@ -148,7 +148,7 @@ int del_student(int fd, int id){
     student_t s;
     int status = get_student(fd, id, &s);
     if (status == SRCH_NOT_FOUND) {
-        printf(M_STD_NOT_FND_MSG);
+        printf(M_STD_NOT_FND_MSG, s.id);
         return ERR_DB_OP;
     }
     if (status == ERR_DB_FILE) {
@@ -160,7 +160,7 @@ int del_student(int fd, int id){
         printf(M_ERR_DB_WRITE);
         return ERR_DB_FILE;
     }
-    printf(M_STD_DEL_MSG);
+    printf(M_STD_DEL_MSG, s.id);
     return NO_ERROR;
 }
 
