@@ -16,6 +16,7 @@ typedef struct cmd_buff
     int  argc;
     char *argv[CMD_ARGV_MAX];
     char *_cmd_buffer;
+
 } cmd_buff_t;
 
 /* WIP - Move to next assignment 

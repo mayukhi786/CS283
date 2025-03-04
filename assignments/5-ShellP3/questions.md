@@ -19,7 +19,7 @@ cd is implemented as a built-in because each process has its own working directo
 4. Currently, your shell supports a fixed number of piped commands (CMD_MAX). How would you modify your implementation to allow an arbitrary number of piped commands while still handling memory allocation efficiently? What trade-offs would you need to consider?
 
 I would use:
-- Dynamic memory allocation in cmd_buff_t instead of a fixed sixed array
+- Dynamic memory allocation in cmd_buff_t instead of a fixed sized array
 - Use dynamic allocation for pipe file descriptors instead of the fixed size array int pipes[CMD_MAX - 1][2]
 
 Trade-offs:

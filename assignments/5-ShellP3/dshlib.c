@@ -6,7 +6,10 @@
 #include <sys/wait.h>
 #include <errno.h>
 #include "dshlib.h"
+
 extern void print_dragon();
+
+#include <fcntl.h> //provides contants for file open operations (for input/output redirection)
 
 
 static int last_command_exit_code = 0; //return code of the last command (for the rc command)
@@ -61,6 +64,11 @@ static void parse(char *input, cmd_buff_t *cmd) {
 
     cmd->_cmd_buffer = strdup(input); //duplicate the input string to cmd->_cmd_buffer
 
+    //set redirection fields
+    cmd->input_redirect = NULL;
+    cmd->output_redirect = NULL;
+    cmd->append_mode = 0;
+
     if (!cmd->_cmd_buffer)  //check if memory allocation was successful
     {
         fprintf(stderr, "Memory allocation error\n");
@@ -74,6 +82,64 @@ static void parse(char *input, cmd_buff_t *cmd) {
             chr++; // skip over leading space
         if (*chr == '\0') //if end is reached, break
             break;
+
+        //input redirection
+        if (*chr == '<') {
+            chr++; //skip over <
+            //skip whitespace after '<'
+            while (*chr && isspace((unsigned char)*chr))
+                chr++;
+
+            //pointer for start of filename
+            char *filename_start = chr;
+            
+            //end of filename
+            while (*chr && !isspace((unsigned char)*chr))
+                chr++;
+            
+            //null terminate filename
+            if (*chr) {
+                *chr = '\0';
+                chr++;
+            }
+            
+            //store input filename
+            cmd->input_redirect = filename_start;
+            continue;
+        }
+        
+        //output redirection
+        if (*chr == '>') {
+            //check for append mode '>>'
+            if (*(chr+1) == '>') {
+                cmd->append_mode = 1; //set flag for append mode to 1
+                chr += 2; //skip the >>
+            } else {
+                cmd->append_mode = 0;
+                chr++; //skip the >
+            }
+            
+            //skip whitespace after '>' or '>>'
+            while (*chr && isspace((unsigned char)*chr))
+                chr++;
+            
+            //pointer for start of filename
+            char *filename_start = chr;
+            
+            //end of filename
+            while (*chr && !isspace((unsigned char)*chr))
+                chr++;
+            
+            //null terminate filename
+            if (*chr) {
+                *chr = '\0';
+                chr++;
+            }
+            
+            //store output filename
+            cmd->output_redirect = filename_start;
+            continue;
+        }
         
         if (*chr == '"') //if argument starts with a quote
         {
@@ -106,8 +172,7 @@ static void parse(char *input, cmd_buff_t *cmd) {
 }
 
 
-
- // Function to parse command lines with multiple commands separated by pipes
+ //Function to parse command lines with multiple commands separated by pipes
 int build_cmd_list(char *cmd_line, command_list_t *clist) {
     clist->num = 0;
     
@@ -142,7 +207,7 @@ int build_cmd_list(char *cmd_line, command_list_t *clist) {
     return OK;
 }
 
-// Free memory allocated for command list
+//Free memory allocated for command list
 int free_cmd_list(command_list_t *clist) {
     for (int i = 0; i < clist->num; i++) {
         free(clist->commands[i]._cmd_buffer);
@@ -164,9 +229,47 @@ int execute_pipeline(command_list_t *clist) {
             return ERR_EXEC_CMD;
         } else if (pid == 0) {
             //child process
+
+            //handle input redirection
+            if (clist->commands[0].input_redirect) {
+                //Open read only file
+                int input_fd = open(clist->commands[0].input_redirect, O_RDONLY);
+                if (input_fd == -1) {
+                    perror("Error opening input file");
+                    exit(errno);
+                }
+                if (dup2(input_fd, STDIN_FILENO) == -1) {
+                    perror("Error redirecting stdin");
+                    close(input_fd);
+                    exit(errno);
+                }
+                close(input_fd);
+            }
+
+            // Handle output redirection
+            if (clist->commands[0].output_redirect) {
+                //Open write only file or create new file
+                //If append mode (>>), append to file else truncate file
+                int output_flags = O_WRONLY | O_CREAT | (clist->commands[0].append_mode ? O_APPEND : O_TRUNC);
+                int output_fd = open(clist->commands[0].output_redirect, output_flags, 0644); //open with appropriate permissions
+
+                if (output_fd == -1) {
+                    perror("Error opening output file");
+                    exit(errno);
+                }
+                if (dup2(output_fd, STDOUT_FILENO) == -1) {
+                    perror("Error redirecting stdout");
+                    close(output_fd);
+                    exit(errno);
+                }
+                close(output_fd);
+            }
+
+            //execute command
             execvp(clist->commands[0].argv[0], clist->commands[0].argv);
             perror(CMD_ERR_EXECUTE);
             exit(errno);
+            
         } else {
             //parent process now
             int status;
@@ -204,6 +307,37 @@ int execute_pipeline(command_list_t *clist) {
         
         if (pids[i] == 0) {
             //child process
+
+            //Handle input redirection for first command
+            if (i == 0 && clist->commands[i].input_redirect) {
+                int input_fd = open(clist->commands[i].input_redirect, O_RDONLY);
+                if (input_fd == -1) {
+                    perror("Error opening input file");
+                    exit(errno);
+                }
+                if (dup2(input_fd, STDIN_FILENO) == -1) {
+                    perror("Error redirecting stdin");
+                    close(input_fd);
+                    exit(errno);
+                }
+                close(input_fd);
+            }
+
+            //Handle output redirection for last command
+            if (i == clist->num - 1 && clist->commands[i].output_redirect) {
+                int output_flags = O_WRONLY | O_CREAT | (clist->commands[i].append_mode ? O_APPEND : O_TRUNC);
+                int output_fd = open(clist->commands[i].output_redirect, output_flags, 0644);
+                if (output_fd == -1) {
+                    perror("Error opening output file");
+                    exit(errno);
+                }
+                if (dup2(output_fd, STDOUT_FILENO) == -1) {
+                    perror("Error redirecting stdout");
+                    close(output_fd);
+                    exit(errno);
+                }
+                close(output_fd);
+            }
             
             //configure stdin from previous pipe (if not first command)
             if (i > 0) {

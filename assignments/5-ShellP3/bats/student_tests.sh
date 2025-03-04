@@ -63,7 +63,6 @@ EOF
 
     expected_output="$rc"
 
-    # Check exact match
     [[ "$output" =~ "$expected_output" ]]
     [ "$status" -eq 0 ]
 
@@ -263,4 +262,95 @@ EOF
 
     # Check exact match
     [ "$stripped_output" = "$expected_output" ]
+}
+
+# Redirction tests 
+
+@test "Simple output redirection" {
+    run ./dsh <<EOF
+echo "hello, class" > out.txt
+cat out.txt
+rm out.txt
+EOF
+
+    [[ "$output" =~ "hello, class" ]] 
+    [ "$status" -eq 0 ]
+
+}
+
+
+@test "Append output redirection" {
+    run ./dsh <<EOF
+echo "hello, class" > out.txt
+echo "this is line 2" >> out.txt
+cat out.txt
+rm out.txt
+EOF
+
+    [[ "$output" =~ "hello, class" ]]
+    [[ "$output" =~ "this is line 2" ]]
+    [ "$status" -eq 0 ]
+}
+
+@test "Simple input redirection" {
+    #Make input file
+    echo "test input file" > input.txt
+
+    run ./dsh <<EOF
+cat < input.txt
+rm input.txt
+EOF
+
+    [[ "$output" =~ "test input file" ]] 
+    [ "$status" -eq 0 ]
+}
+
+@test "Pipes and redirection" {
+    run ./dsh <<EOF
+echo "hello world" | grep world > out.txt
+cat out.txt
+rm out.txt
+EOF
+
+    [[ "$output" =~ "hello world" ]] 
+    [ "$status" -eq 0 ]
+
+}
+
+@test "Multiple redirections" {
+    run ./dsh << EOF
+echo "hello class" > out1.txt
+echo "this is line 2" > out2.txt
+cat out1.txt
+cat out2.txt
+rm out1.txt out2.txt
+EOF
+
+    [[ "$output" =~ "hello class" ]]
+    [[ "$output" =~ "this is line 2" ]]
+    [ "$status" -eq 0 ]
+}
+
+@test "Redirection error handling" {
+    run ./dsh <<EOF
+cat < non_existent_file.txt
+EOF
+
+    #output should contain error message
+    [[ "$output" =~ "Error opening input file" ]]
+    [ "$status" -eq 0 ]
+}
+
+@test "Redirection with built-in command" {
+    #Running a command that will set a non-zero exit code
+    run ./dsh << EOF
+ls /non_existent_directory
+rc > rc_output.txt
+cat rc_output.txt
+rm rc_output.txt
+EOF
+
+    #output should contain the non-zero exit code
+    [[ "$output" =~ [1-9] ]]
+    [ "$status" -eq 0 ]
 }

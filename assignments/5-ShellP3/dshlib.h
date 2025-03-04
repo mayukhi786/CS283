@@ -22,6 +22,11 @@ typedef struct cmd_buff
     int  argc;
     char *argv[CMD_ARGV_MAX];
     char *_cmd_buffer;
+
+    //extra fields for redirection
+    char *input_redirect;   //filename for input redirection
+    char *output_redirect;  //filename for output redirection
+    int  append_mode;       //flag for append (>>)
 } cmd_buff_t;
 
 /* WIP - Move to next assignment 
